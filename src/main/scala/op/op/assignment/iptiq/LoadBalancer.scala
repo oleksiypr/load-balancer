@@ -12,13 +12,22 @@ object LoadBalancer {
   final case class Register(providers: Vector[ActorRef[Query]]) extends Query
   final case class Get(replyTo: ActorRef[String]) extends Query
 
-  def balancer(providers: Vector[ActorRef[Query]]): Behavior[Message] =
+  type BalanceStrategy = (Int, Int) => Int
+
+  def roundRobin(n: Int, i: Int): Int =  (i + 1) % n
+
+  def balancer(
+    providers: Vector[ActorRef[Query]]
+  )(current: Int = 0, next: BalanceStrategy = roundRobin): Behavior[Message] =
     Behaviors.setup[Message] { ctx =>
+      val n = providers.size
       Behaviors.receiveMessage[Message] {
-        case Register(ps) => balancer(providers ++ ps)
+        case Register(ps) =>
+          val updated = providers ++ ps
+          balancer(updated)(current = 0)
         case req @ Get(_) =>
-          providers(0) ! req
-          Behaviors.same
+          providers(current) ! req
+          balancer(providers)(next(n, current))
       }
     }
 }

@@ -14,8 +14,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
   import LoadBalancer._
 
   "LoadBalancer" must {
-    "register a lsit of providers" in {
-      val testKit = BehaviorTestKit(balancer(Vector.empty))
+    "register a list of providers" in {
+      val testKit = BehaviorTestKit(balancer(Vector.empty)())
 
       val sender  = TestInbox[String]()
 
@@ -23,8 +23,13 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val inbox2 = TestInbox[Query]()
 
       testKit.run(Register(Vector(inbox1.ref, inbox2.ref)))
+
+      testKit.run(Get(sender.ref))
+      testKit.run(Get(sender.ref))
       testKit.run(Get(sender.ref))
 
+      inbox1.expectMessage(Get(sender.ref))
+      inbox2.expectMessage(Get(sender.ref))
       inbox1.expectMessage(Get(sender.ref))
     }
   }
