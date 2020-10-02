@@ -17,7 +17,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
 
   "LoadBalancer" must {
     "register a list of providers" in {
-      val testKit = BehaviorTestKit(balancer(Vector.empty)())
+      val testKit = BehaviorTestKit(idle(max = 2))
 
       val requester  = TestInbox[String]()
 
@@ -35,6 +35,23 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       inbox1.expectMessage(Get(requester.ref))
     }
 
+    "register not more than max providers" in {
+      val testKit = BehaviorTestKit(idle(max = 1))
+
+      val requester = TestInbox[String]()
+      val inbox1    = TestInbox[Query]()
+      val inbox2    = TestInbox[Query]()
+
+      testKit.run(Register(Vector(inbox1.ref, inbox2.ref)))
+
+      testKit.run(Get(requester.ref))
+      testKit.run(Get(requester.ref))
+
+      inbox1.expectMessage(Get(requester.ref))
+      inbox1.expectMessage(Get(requester.ref))
+      inbox2.hasMessages shouldBe false
+    }
+
     "handle result from provider" in {
       val provider = TestInbox[Query]()
       val testKit = BehaviorTestKit(balancer(Vector(provider.ref))())
@@ -44,6 +61,18 @@ class LoadBalancerSpec extends WordSpec with Matchers {
 
       testKit.run(Response(id, requester.ref))
       requester.expectMessage(id)
+    }
+
+    "create heart beat checkers" in {
+      val testKit = BehaviorTestKit(idle(max = 2))
+
+      val inbox1    = TestInbox[Query]()
+      val inbox2    = TestInbox[Query]()
+
+      testKit.run(Register(Vector(inbox1.ref, inbox2.ref)))
+
+      testKit.expectEffectType[SpawnedAnonymous[HeartBeat.Message]]
+      testKit.expectEffectType[SpawnedAnonymous[HeartBeat.Message]]
     }
   }
 }
