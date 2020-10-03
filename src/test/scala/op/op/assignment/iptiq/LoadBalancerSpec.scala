@@ -23,8 +23,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       providerInbox1.hasMessages shouldBe false
       providerInbox2.hasMessages shouldBe false
 
-      testKit.run(ProviderUp(0))
-      testKit.run(ProviderUp(1))
+      testKit.run(Include(0))
+      testKit.run(Include(1))
 
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
@@ -43,7 +43,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val provider2 = TestInbox[Provider.Message]()
 
       testKit.run(Register(Vector(provider1.ref, provider2.ref)))
-      testKit.run(ProviderUp(0))
+      testKit.run(Include(0))
 
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
@@ -112,11 +112,11 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       providerInbox.hasMessages shouldBe false
 
-      testKit.run(ProviderUp(0))
+      testKit.run(Include(0))
       testKit.run(Request(requester.ref))
       providerInbox.expectMessage(Provider.Get(requester.ref))
 
-      testKit.run(ProviderDown(0))
+      testKit.run(Exclude(0))
       testKit.run(Request(requester.ref))
       providerInbox.hasMessages shouldBe false
     }

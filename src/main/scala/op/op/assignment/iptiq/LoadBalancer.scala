@@ -22,8 +22,8 @@ object LoadBalancer {
       else Some(available(i))
     }
 
-    def providerUp(i: Int)  : Providers = statusUpdated(i, Available)
-    def providerDown(i: Int): Providers = statusUpdated(i, Unavailable)
+    def included(i: Int): Providers = statusUpdated(i, Available)
+    def excluded(i: Int): Providers = statusUpdated(i, Unavailable)
 
     private def statusUpdated(i: Int, s: ProviderStatus): Providers =
       if (i < 0 || i >= states.size) this
@@ -38,8 +38,8 @@ object LoadBalancer {
   final case class Register(providerRefs: Vector[ActorRef[Provider.Get]]) extends Message
   final case class Request(replyTo: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
-  final case class ProviderUp(index: Int) extends Message
-  final case class ProviderDown(index: Int) extends Message
+  final case class Include(index: Int) extends Message
+  final case class Exclude(index: Int) extends Message
 
   type Max    = Int
   type Index  = Int
@@ -89,11 +89,11 @@ object LoadBalancer {
         requester ! id
         Behaviors.same
 
-      case ProviderUp(index) =>
-        balancer(providers.providerUp(index), strategy)(current)
+      case Include(index) =>
+        balancer(providers.included(index), strategy)(current)
 
-      case ProviderDown(index) =>
-        balancer(providers.providerDown(index), strategy)(current)
+      case Exclude(index) =>
+        balancer(providers.excluded(index), strategy)(current)
 
       case Register(_) => Behaviors.same
     }
@@ -117,5 +117,4 @@ object HeartBeat {
     Behaviors.setup[Message] { _ =>
       Behaviors.receiveMessage[Message](_ => Behaviors.same)
     }
-
 }
