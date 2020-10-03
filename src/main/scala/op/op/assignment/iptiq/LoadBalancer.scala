@@ -13,7 +13,6 @@ object LoadBalancer {
   final case class ProviderState(providerRef: ActorRef[Provider.Get], status: ProviderStatus)
 
   final case class Providers(states: Vector[ProviderState]) {
-
     private[this] val available = states.filter(_.status == Available)
 
     val size: Int = available.size
@@ -22,12 +21,21 @@ object LoadBalancer {
       if (i < 0 || i >= size) None
       else Some(available(i))
     }
+
+    def providerUp(i: Int): Providers =
+      if (i < 0 || i >= states.size) this
+      else {
+        val available = states(i).copy(status = Available)
+        val updated   = states.updated(i, available)
+        copy(updated)
+      }
   }
 
   sealed trait Message
   final case class Register(providerRefs: Vector[ActorRef[Provider.Get]]) extends Message
   final case class Request(replyTo: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
+  final case class ProviderUp(index: Int) extends Message
 
   type BalanceStrategy = Int => Int
 
@@ -68,8 +76,10 @@ object LoadBalancer {
           requester ! id
           Behaviors.same
 
-        case Register(_) =>
-          Behaviors.same
+        case ProviderUp(index) =>
+          balancer(providers.providerUp(index))(current)
+
+        case Register(_) => Behaviors.same
       }
     }
 }

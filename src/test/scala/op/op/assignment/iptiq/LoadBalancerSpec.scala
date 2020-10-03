@@ -11,22 +11,21 @@ class LoadBalancerSpec extends WordSpec with Matchers {
 
   "LoadBalancer" must {
     "register a list of providers" in {
-      val testKit = BehaviorTestKit(idle(max = 2))
+      val testKit   = BehaviorTestKit(idle(max = 2))
+      val requester = TestInbox[String]()
 
-      val requester  = TestInbox[String]()
+      val providerInbox1 = TestInbox[Provider.Message]()
+      val providerInbox2 = TestInbox[Provider.Message]()
 
-      val provider1 = TestInbox[Provider.Message]()
-      val provider2 = TestInbox[Provider.Message]()
-
-      testKit.run(Register(Vector(provider1.ref, provider2.ref)))
+      testKit.run(Register(Vector(providerInbox1.ref, providerInbox2.ref)))
 
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      provider1.expectMessage(Provider.Get(requester.ref))
-      provider2.expectMessage(Provider.Get(requester.ref))
-      provider1.expectMessage(Provider.Get(requester.ref))
+      providerInbox1.expectMessage(Provider.Get(requester.ref))
+      providerInbox2.expectMessage(Provider.Get(requester.ref))
+      providerInbox1.expectMessage(Provider.Get(requester.ref))
     }
 
     "register not more than max providers" in {
@@ -87,6 +86,29 @@ class LoadBalancerSpec extends WordSpec with Matchers {
 
       testKit.expectEffectType[SpawnedAnonymous[HeartBeat.Message]]
       testKit.expectEffectType[SpawnedAnonymous[HeartBeat.Message]]
+    }
+
+    "handle ProviderStatus messages" in {
+      val providerInbox = TestInbox[Provider.Get]()
+
+      val providers = Providers(
+        Vector(
+          ProviderState(
+            providerInbox.ref,
+            LoadBalancer.Unavailable
+          )
+        )
+      )
+
+      val requester = TestInbox[String]()
+      val testKit   = BehaviorTestKit(balancer(providers)(current = 0))
+
+      testKit.run(Request(requester.ref))
+      providerInbox.hasMessages shouldBe false
+
+      testKit.run(ProviderUp(0))
+      testKit.run(Request(requester.ref))
+      providerInbox.expectMessage(Provider.Get(requester.ref))
     }
   }
 }
