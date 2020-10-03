@@ -6,8 +6,18 @@ import op.op.assignment.iptiq.Provider.Get
 
 object LoadBalancer {
 
+  sealed trait ProviderStatus
+  case object Available extends ProviderStatus
+  case object Unavailable extends ProviderStatus
+
+  final case class ProviderState(providerRef: ActorRef[Provider.Get], status: ProviderStatus)
+  final case class Providers(states: Vector[ProviderState]) {
+    val size: Int = states.size
+    def apply(i: Int): ProviderState = states(i)
+  }
+
   sealed trait Message
-  final case class Register(providers: Vector[ActorRef[Provider.Get]]) extends Message
+  final case class Register(providerRefs: Vector[ActorRef[Provider.Get]]) extends Message
   final case class Request(replyTo: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
 
@@ -18,24 +28,25 @@ object LoadBalancer {
   def idle(max: Int): Behavior[Message] =
     Behaviors.setup[Message] { ctx =>
       Behaviors.receiveMessage[Message] {
-        case Register(providers) =>
-          val ps = providers.take(max)
+        case Register(providerRefs) =>
+          val ps = providerRefs.take(max)
+          val providers = Providers(ps.map(ProviderState(_, Available)))
           ps.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
-          balancer(providers.take(max))(current = 0)
+          balancer(providers)(current = 0)
         case _ =>
           Behaviors.same
       }
     }
 
   def balancer(
-    providers: Vector[ActorRef[Provider.Get]]
+    providers: Providers = Providers(Vector.empty)
   )(current: Int = 0,
     next: BalanceStrategy = roundRobin(providers.size)
   ): Behavior[Message] =
-    Behaviors.setup[Message] { ctx =>
+    Behaviors.setup[Message] { _ =>
       Behaviors.receiveMessage[Message] {
         case Request(replyTo) =>
-          providers(current) ! Get(replyTo)
+          providers(current).providerRef ! Get(replyTo)
           balancer(providers)(next(current))
         case Response(id, requester) =>
           requester ! id

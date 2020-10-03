@@ -47,8 +47,18 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     }
 
     "handle result from provider" in {
-      val provider = TestInbox[Provider.Get]()
-      val testKit = BehaviorTestKit(balancer(Vector(provider.ref))())
+      val providerInbox = TestInbox[Provider.Get]()
+
+      val providers = Providers(
+        Vector(
+          ProviderState(
+            providerInbox.ref,
+            LoadBalancer.Available
+          )
+        )
+      )
+
+      val testKit = BehaviorTestKit(balancer(providers)())
 
       val id = UUID.randomUUID().toString
       val requester  = TestInbox[String]()
