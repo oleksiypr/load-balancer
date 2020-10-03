@@ -2,15 +2,13 @@ package op.op.assignment.iptiq
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import op.op.assignment.iptiq.LoadBalancer.Message
+import op.op.assignment.iptiq.Provider.Get
 
 object LoadBalancer {
 
   sealed trait Message
-  sealed trait Query extends Message
-  sealed trait Command extends Message
-  final case class Register(providers: Vector[ActorRef[Query]]) extends Command
-  final case class Get(replyTo: ActorRef[String]) extends Query
+  final case class Register(providers: Vector[ActorRef[Provider.Get]]) extends Message
+  final case class Request(replyTo: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
 
   type BalanceStrategy = Int => Int
@@ -30,14 +28,14 @@ object LoadBalancer {
     }
 
   def balancer(
-    providers: Vector[ActorRef[Query]]
+    providers: Vector[ActorRef[Provider.Get]]
   )(current: Int = 0,
     next: BalanceStrategy = roundRobin(providers.size)
   ): Behavior[Message] =
     Behaviors.setup[Message] { ctx =>
       Behaviors.receiveMessage[Message] {
-        case req @ Get(_) =>
-          providers(current) ! req
+        case Request(replyTo) =>
+          providers(current) ! Get(replyTo)
           balancer(providers)(next(current))
         case Response(id, requester) =>
           requester ! id
@@ -46,6 +44,12 @@ object LoadBalancer {
           Behaviors.same
       }
     }
+}
+
+object Provider {
+
+  sealed trait Message
+  final case class Get(replyTo: ActorRef[String]) extends Message
 }
 
 object HeartBeat {
