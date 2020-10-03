@@ -2,6 +2,7 @@ package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.ActorRef
 import LoadBalancer._
+import op.op.assignment.iptiq.provider.Provider
 
 private[balancer] sealed trait Status
 private[balancer] case object Available extends Status

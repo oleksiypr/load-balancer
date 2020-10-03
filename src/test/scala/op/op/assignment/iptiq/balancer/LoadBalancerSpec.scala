@@ -3,6 +3,7 @@ package op.op.assignment.iptiq.balancer
 import java.util.UUID
 import akka.actor.testkit.typed.Effect._
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
+import op.op.assignment.iptiq.provider.Provider
 import org.scalatest.{Matchers, WordSpec}
 
 class LoadBalancerSpec extends WordSpec with Matchers {

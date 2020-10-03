@@ -2,7 +2,7 @@ package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import op.op.assignment.iptiq.balancer.Provider.Get
+import op.op.assignment.iptiq.provider.Provider
 
 object LoadBalancer {
 
@@ -51,7 +51,7 @@ object LoadBalancer {
       case Request(replyTo) =>
         providers(current) match {
           case Some(p) =>
-            p.providerRef ! Get(replyTo)
+            p.providerRef ! Provider.Get(replyTo)
             balancer(providers, strategy)(next(current))
           case None    =>
             replyTo ! "No providers available"
@@ -74,23 +74,4 @@ object LoadBalancer {
       case Register(_) => Behaviors.same
     }
   }
-}
-
-object Provider {
-
-  sealed trait Message
-  final case class Get(replyTo: ActorRef[String]) extends Message
-}
-
-object HeartBeat {
-
-  sealed trait Message
-  case object Check extends Message
-
-  def checker(
-    balancer: ActorRef[LoadBalancer.Message]
-  ): Behavior[Message] =
-    Behaviors.setup[Message] { _ =>
-      Behaviors.receiveMessage[Message](_ => Behaviors.same)
-    }
 }
