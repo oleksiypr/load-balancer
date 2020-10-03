@@ -41,34 +41,45 @@ object LoadBalancer {
   final case class ProviderUp(index: Int) extends Message
   final case class ProviderDown(index: Int) extends Message
 
-  type BalanceStrategy = Int => Int
+  type Max    = Int
+  type Index  = Int
+  type Next   = Int
+
+  type BalanceStrategy = Max => Index => Next
 
   def roundRobin(n: Int)(i: Int): Int =  (i + 1) % n
 
-  def idle(max: Int): Behavior[Message] =
-    Behaviors.setup[Message] { ctx =>
-      Behaviors.receiveMessage[Message] {
-        case Register(providerRefs) =>
-          val ps = providerRefs.take(max)
-          val providers = Providers(ps.map(ProviderState(_, Unavailable)))
-          ps.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
-          balancer(providers)(current = 0)
-        case _ =>
-          Behaviors.same
-      }
+  def idle(
+    max: Int,
+    strategy: BalanceStrategy = roundRobin
+  ): Behavior[Message] = Behaviors.setup[Message] { ctx =>
+    Behaviors.receiveMessage[Message] {
+
+      case Register(providerRefs) =>
+        val refs = providerRefs.take(max)
+        val providers = Providers(refs.map(ProviderState(_, Unavailable)))
+        refs.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
+        balancer(providers, strategy)(current = 0)
+
+      case _ =>
+        Behaviors.same
     }
+  }
 
   def balancer(
-    providers: Providers = Providers(Vector.empty)
-  )(current: Int,
-    next: BalanceStrategy = roundRobin(providers.size)
+    providers: Providers = Providers(Vector.empty),
+    strategy: BalanceStrategy
+  )(
+    current: Int,
+    next: Index => Next = strategy(providers.size)
   ): Behavior[Message] = Behaviors.setup[Message] { _ =>
+
     Behaviors.receiveMessage[Message] {
       case Request(replyTo) =>
         providers(current) match {
           case Some(p) =>
             p.providerRef ! Get(replyTo)
-            balancer(providers)(next(current))
+            balancer(providers, strategy)(next(current))
           case None    =>
             replyTo ! "No providers available"
             Behaviors.same
@@ -79,10 +90,10 @@ object LoadBalancer {
         Behaviors.same
 
       case ProviderUp(index) =>
-        balancer(providers.providerUp(index))(current)
+        balancer(providers.providerUp(index), strategy)(current)
 
       case ProviderDown(index) =>
-        balancer(providers.providerDown(index))(current)
+        balancer(providers.providerDown(index), strategy)(current)
 
       case Register(_) => Behaviors.same
     }
