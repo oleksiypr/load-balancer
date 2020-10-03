@@ -1,4 +1,4 @@
-package op.op.assignment.iptiq
+package op.op.assignment.iptiq.balancer
 
 import java.util.UUID
 import akka.actor.testkit.typed.Effect._
@@ -54,7 +54,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     }
 
     "handle result from provider" in {
-      val providers = Providers(Vector.empty)
+      val providers = State(Vector.empty)
       val testKit   = BehaviorTestKit(balancer(providers, roundRobin)(current = 0))
 
       val id        = UUID.randomUUID().toString
@@ -68,9 +68,9 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val providerInbox1 = TestInbox[Provider.Get]()
       val providerInbox2 = TestInbox[Provider.Get]()
 
-      val available   = State(providerInbox1.ref, LoadBalancer.Available)
-      val unavailable = State(providerInbox2.ref, LoadBalancer.Unavailable)
-      val providers   = Providers(Vector(available, unavailable))
+      val available   = ProviderState(providerInbox1.ref, LoadBalancer.Available)
+      val unavailable = ProviderState(providerInbox2.ref, LoadBalancer.Unavailable)
+      val providers   = State(Vector(available, unavailable))
 
       val testKit   = BehaviorTestKit(balancer(providers, roundRobin)(current = 0))
       val requester = TestInbox[String]()
@@ -97,9 +97,9 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     "handle ProviderStatus messages" in {
       val providerInbox = TestInbox[Provider.Get]()
 
-      val providers = Providers(
+      val providers = State(
         Vector(
-          State(
+          ProviderState(
             providerInbox.ref,
             LoadBalancer.Unavailable
           )
@@ -124,9 +124,9 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     "include/exclude a specific provider into the balancer" in {
       val providerInbox = TestInbox[Provider.Get]()
 
-      val providers = Providers(
+      val providers = State(
         Vector(
-          State(
+          ProviderState(
             providerInbox.ref,
             LoadBalancer.Available
           )

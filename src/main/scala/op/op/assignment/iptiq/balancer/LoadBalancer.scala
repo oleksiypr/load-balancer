@@ -1,8 +1,8 @@
-package op.op.assignment.iptiq
+package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import op.op.assignment.iptiq.Provider.Get
+import op.op.assignment.iptiq.balancer.Provider.Get
 
 object LoadBalancer {
 
@@ -30,25 +30,25 @@ object LoadBalancer {
       }
   }
 
-  private[iptiq] final case class State(providerRef: ActorRef[Provider.Get], status: Status)
+  private[iptiq] final case class ProviderState(providerRef: ActorRef[Provider.Get], status: Status)
 
-  private[iptiq] final case class Providers(providers: Vector[State]) {
+  private[iptiq] final case class State(providers: Vector[ProviderState]) {
 
     private[this] val available = providers.filter(_.status == Available)
 
     val size: Int = available.size
 
-    def apply(i: Int): Option[State] = {
+    def apply(i: Int): Option[ProviderState] = {
       if (i < 0 || i >= size) None
       else Some(available(i))
     }
 
-    def up(i: Int)  : Providers = updated(i, Status.Up)
-    def down(i: Int): Providers = updated(i, Status.Down)
+    def up(i: Int)  : State = updated(i, Status.Up)
+    def down(i: Int): State = updated(i, Status.Down)
 
-    def exclude(i: Index): Providers = updated(i, Status.Off)
+    def exclude(i: Index): State = updated(i, Status.Off)
 
-    private def updated(i: Int, e: Status.Event): Providers =
+    private def updated(i: Int, e: Status.Event): State =
       if (i < 0 || i >= providers.size) this
       else {
         val provider = providers(i)
@@ -82,7 +82,7 @@ object LoadBalancer {
 
       case Register(providerRefs) =>
         val refs = providerRefs.take(max)
-        val providers = Providers(refs.map(State(_, Unavailable)))
+        val providers = State(refs.map(ProviderState(_, Unavailable)))
         refs.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
         balancer(providers, strategy)(current = 0)
 
@@ -92,14 +92,14 @@ object LoadBalancer {
   }
 
   def balancer(
-    providers: Providers = Providers(Vector.empty),
+    providers: State = State(Vector.empty),
     strategy: BalanceStrategy
   )(
     current: Int,
     next: Index => Next = strategy(providers.size)
   ): Behavior[Message] = Behaviors.setup[Message] { _ =>
-
     Behaviors.receiveMessage[Message] {
+
       case Request(replyTo) =>
         providers(current) match {
           case Some(p) =>
@@ -145,5 +145,4 @@ object HeartBeat {
     Behaviors.setup[Message] { _ =>
       Behaviors.receiveMessage[Message](_ => Behaviors.same)
     }
-
 }
