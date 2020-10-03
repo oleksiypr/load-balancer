@@ -68,8 +68,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val providerInbox1 = TestInbox[Provider.Get]()
       val providerInbox2 = TestInbox[Provider.Get]()
 
-      val available   = ProviderState(providerInbox1.ref, LoadBalancer.Available)
-      val unavailable = ProviderState(providerInbox2.ref, LoadBalancer.Unavailable)
+      val available   = ProviderState(providerInbox1.ref, Available)
+      val unavailable = ProviderState(providerInbox2.ref, Unavailable)
       val providers   = State(Vector(available, unavailable))
 
       val testKit   = BehaviorTestKit(balancer(providers, roundRobin)(current = 0))
@@ -101,7 +101,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
         Vector(
           ProviderState(
             providerInbox.ref,
-            LoadBalancer.Unavailable
+            Unavailable
           )
         )
       )
@@ -128,7 +128,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
         Vector(
           ProviderState(
             providerInbox.ref,
-            LoadBalancer.Available
+            Available
           )
         )
       )

@@ -6,58 +6,6 @@ import op.op.assignment.iptiq.balancer.Provider.Get
 
 object LoadBalancer {
 
-  private[iptiq] sealed trait Status
-  private[iptiq] case object Available extends Status
-  private[iptiq] case object Unavailable extends Status
-  private[iptiq] case object Excluded extends Status
-
-  private[iptiq] object Status {
-
-    sealed trait Event
-    case object Up extends Event
-    case object Down extends Event
-    case object Off extends Event
-    case object On extends Event
-
-    def transition(s: Status, e: Event): Status =
-      (s, e) match {
-        case (Excluded, On) => Unavailable
-        case (Excluded, _)  => Excluded
-        case (_, Off)       => Excluded
-        case (_, Up)        => Available
-        case (_, Down)      => Unavailable
-        case (_, On)        => s
-      }
-  }
-
-  private[iptiq] final case class ProviderState(providerRef: ActorRef[Provider.Get], status: Status)
-
-  private[iptiq] final case class State(providers: Vector[ProviderState]) {
-
-    private[this] val available = providers.filter(_.status == Available)
-
-    val size: Int = available.size
-
-    def apply(i: Int): Option[ProviderState] = {
-      if (i < 0 || i >= size) None
-      else Some(available(i))
-    }
-
-    def up(i: Int)  : State = updated(i, Status.Up)
-    def down(i: Int): State = updated(i, Status.Down)
-
-    def exclude(i: Index): State = updated(i, Status.Off)
-
-    private def updated(i: Int, e: Status.Event): State =
-      if (i < 0 || i >= providers.size) this
-      else {
-        val provider = providers(i)
-        val updated  = Status.transition(provider.status, e)
-        if (updated == provider.status) this
-        else copy(providers.updated(i, provider.copy(status = updated)))
-      }
-  }
-
   sealed trait Message
   final case class Register(providerRefs: Vector[ActorRef[Provider.Get]]) extends Message
   final case class Request(replyTo: ActorRef[String]) extends Message
