@@ -50,7 +50,7 @@ object LoadBalancer {
       Behaviors.receiveMessage[Message] {
         case Register(providerRefs) =>
           val ps = providerRefs.take(max)
-          val providers = Providers(ps.map(ProviderState(_, Available)))
+          val providers = Providers(ps.map(ProviderState(_, Unavailable)))
           ps.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
           balancer(providers)(current = 0)
         case _ =>
@@ -62,33 +62,31 @@ object LoadBalancer {
     providers: Providers = Providers(Vector.empty)
   )(current: Int,
     next: BalanceStrategy = roundRobin(providers.size)
-  ): Behavior[Message] =
-    Behaviors.setup[Message] { _ =>
-      Behaviors.receiveMessage[Message] {
+  ): Behavior[Message] = Behaviors.setup[Message] { _ =>
+    Behaviors.receiveMessage[Message] {
+      case Request(replyTo) =>
+        providers(current) match {
+          case Some(p) =>
+            p.providerRef ! Get(replyTo)
+            balancer(providers)(next(current))
+          case None    =>
+            replyTo ! "No providers available"
+            Behaviors.same
+        }
 
-        case Request(replyTo) =>
-          providers(current) match {
-            case Some(p) =>
-              p.providerRef ! Get(replyTo)
-              balancer(providers)(next(current))
-            case None    =>
-              replyTo ! "No providers available"
-              Behaviors.same
-          }
+      case Response(id, requester) =>
+        requester ! id
+        Behaviors.same
 
-        case Response(id, requester) =>
-          requester ! id
-          Behaviors.same
+      case ProviderUp(index) =>
+        balancer(providers.providerUp(index))(current)
 
-        case ProviderUp(index) =>
-          balancer(providers.providerUp(index))(current)
+      case ProviderDown(index) =>
+        balancer(providers.providerDown(index))(current)
 
-        case ProviderDown(index) =>
-          balancer(providers.providerDown(index))(current)
-
-        case Register(_) => Behaviors.same
-      }
+      case Register(_) => Behaviors.same
     }
+  }
 }
 
 object Provider {
