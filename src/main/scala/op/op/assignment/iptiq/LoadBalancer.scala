@@ -11,9 +11,17 @@ object LoadBalancer {
   case object Unavailable extends ProviderStatus
 
   final case class ProviderState(providerRef: ActorRef[Provider.Get], status: ProviderStatus)
+
   final case class Providers(states: Vector[ProviderState]) {
-    val size: Int = states.size
-    def apply(i: Int): ProviderState = states(i)
+
+    private[this] val available = states.filter(_.status == Available)
+
+    val size: Int = available.size
+
+    def apply(i: Int): Option[ProviderState] = {
+      if (i < 0 || i >= size) None
+      else Some(available(i))
+    }
   }
 
   sealed trait Message
@@ -40,17 +48,26 @@ object LoadBalancer {
 
   def balancer(
     providers: Providers = Providers(Vector.empty)
-  )(current: Int = 0,
+  )(current: Int,
     next: BalanceStrategy = roundRobin(providers.size)
   ): Behavior[Message] =
     Behaviors.setup[Message] { _ =>
       Behaviors.receiveMessage[Message] {
+
         case Request(replyTo) =>
-          providers(current).providerRef ! Get(replyTo)
-          balancer(providers)(next(current))
+          providers(current) match {
+            case Some(p) =>
+              p.providerRef ! Get(replyTo)
+              balancer(providers)(next(current))
+            case None    =>
+              replyTo ! "No providers available"
+              Behaviors.same
+          }
+
         case Response(id, requester) =>
           requester ! id
           Behaviors.same
+
         case Register(_) =>
           Behaviors.same
       }

@@ -47,24 +47,34 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     }
 
     "handle result from provider" in {
-      val providerInbox = TestInbox[Provider.Get]()
+      val providers = Providers(Vector.empty)
+      val testKit   = BehaviorTestKit(balancer(providers)(current = 0))
 
-      val providers = Providers(
-        Vector(
-          ProviderState(
-            providerInbox.ref,
-            LoadBalancer.Available
-          )
-        )
-      )
-
-      val testKit = BehaviorTestKit(balancer(providers)())
-
-      val id = UUID.randomUUID().toString
-      val requester  = TestInbox[String]()
+      val id        = UUID.randomUUID().toString
+      val requester = TestInbox[String]()
 
       testKit.run(Response(id, requester.ref))
       requester.expectMessage(id)
+    }
+
+    "invoke available providers only" in {
+      val providerInbox1 = TestInbox[Provider.Get]()
+      val providerInbox2 = TestInbox[Provider.Get]()
+
+      val available   = ProviderState(providerInbox1.ref, LoadBalancer.Available)
+      val unavailable = ProviderState(providerInbox2.ref, LoadBalancer.Unavailable)
+      val providers   = Providers(Vector(available, unavailable))
+
+      val testKit   = BehaviorTestKit(balancer(providers)(current = 0))
+      val requester = TestInbox[String]()
+
+      testKit.run(Request(requester.ref))
+      testKit.run(Request(requester.ref))
+      testKit.run(Request(requester.ref))
+
+      providerInbox1.expectMessage(Provider.Get(requester.ref))
+      providerInbox2.hasMessages shouldBe false
+      providerInbox1.expectMessage(Provider.Get(requester.ref))
     }
 
     "create heart beat checkers" in {
