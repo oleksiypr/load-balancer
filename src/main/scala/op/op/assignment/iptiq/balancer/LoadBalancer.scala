@@ -1,6 +1,6 @@
 package op.op.assignment.iptiq.balancer
 
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import op.op.assignment.iptiq.provider.Provider
 
@@ -21,18 +21,23 @@ object LoadBalancer {
 
   type BalanceStrategy = Max => Index => Next
 
+  type HeartBeatFactory = ActorContext[Message] => Behavior[HeartBeat.Message]
+
+  val noHeartBeat: HeartBeatFactory = _ => Behaviors.ignore
+
   def roundRobin(n: Int)(i: Int): Int =  (i + 1) % n
 
   def idle(
     max: Int,
-    strategy: BalanceStrategy = roundRobin
+    strategy: BalanceStrategy = roundRobin,
+    heartBeatFactory: HeartBeatFactory = noHeartBeat
   ): Behavior[Message] = Behaviors.setup[Message] { ctx =>
     Behaviors.receiveMessage[Message] {
 
       case Register(providerRefs) =>
         val refs = providerRefs.take(max)
         val providers = State(refs.map(ProviderState(_, Unavailable)))
-        refs.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
+        refs.foreach(_ => ctx.spawnAnonymous(heartBeatFactory(ctx)))
         balancer(providers, strategy)(current = 0)
 
       case _ =>
