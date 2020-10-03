@@ -6,35 +6,55 @@ import op.op.assignment.iptiq.Provider.Get
 
 object LoadBalancer {
 
-  sealed trait ProviderStatus
-  case object Available extends ProviderStatus
-  case object Unavailable extends ProviderStatus
-  case object Excluded extends ProviderStatus
+  private[iptiq] sealed trait Status
+  private[iptiq] case object Available extends Status
+  private[iptiq] case object Unavailable extends Status
+  private[iptiq] case object Excluded extends Status
 
-  final case class ProviderState(providerRef: ActorRef[Provider.Get], status: ProviderStatus)
+  private[iptiq] object Status {
 
-  final case class Providers(states: Vector[ProviderState]) {
+    sealed trait Event
+    case object Up extends Event
+    case object Down extends Event
+    case object Off extends Event
+    case object On extends Event
 
-    private[this] val available = states.filter(_.status == Available)
+    def transition(s: Status, e: Event): Status =
+      (s, e) match {
+        case (Excluded, On) => Unavailable
+        case (Excluded, _)  => Excluded
+        case (_, Off)       => Excluded
+        case (_, Up)        => Available
+        case (_, Down)      => Unavailable
+        case (_, On)        => s
+      }
+  }
+
+  private[iptiq] final case class State(providerRef: ActorRef[Provider.Get], status: Status)
+
+  private[iptiq] final case class Providers(providers: Vector[State]) {
+
+    private[this] val available = providers.filter(_.status == Available)
 
     val size: Int = available.size
 
-    def apply(i: Int): Option[ProviderState] = {
+    def apply(i: Int): Option[State] = {
       if (i < 0 || i >= size) None
       else Some(available(i))
     }
 
-    def providerUp(i: Int)  : Providers = statusUpdated(i, Available)
-    def providerDown(i: Int): Providers = statusUpdated(i, Unavailable)
+    def up(i: Int)  : Providers = updated(i, Status.Up)
+    def down(i: Int): Providers = updated(i, Status.Down)
 
-    def exclude(i: Index): Providers = statusUpdated(i, Excluded)
+    def exclude(i: Index): Providers = updated(i, Status.Off)
 
-    private def statusUpdated(i: Int, s: ProviderStatus): Providers =
-      if (i < 0 || i >= states.size) this
+    private def updated(i: Int, e: Status.Event): Providers =
+      if (i < 0 || i >= providers.size) this
       else {
-        val state   = states(i).copy(status = s)
-        val updated = states.updated(i, state)
-        copy(updated)
+        val provider = providers(i)
+        val updated  = Status.transition(provider.status, e)
+        if (updated == provider.status) this
+        else copy(providers.updated(i, provider.copy(status = updated)))
       }
   }
 
@@ -62,7 +82,7 @@ object LoadBalancer {
 
       case Register(providerRefs) =>
         val refs = providerRefs.take(max)
-        val providers = Providers(refs.map(ProviderState(_, Unavailable)))
+        val providers = Providers(refs.map(State(_, Unavailable)))
         refs.foreach(_ => ctx.spawnAnonymous(HeartBeat.checker(ctx.self)))
         balancer(providers, strategy)(current = 0)
 
@@ -95,10 +115,10 @@ object LoadBalancer {
         Behaviors.same
 
       case ProviderUp(index) =>
-        balancer(providers.providerUp(index), strategy)(current)
+        balancer(providers.up(index), strategy)(current)
 
       case ProviderDown(index) =>
-        balancer(providers.providerDown(index), strategy)(current)
+        balancer(providers.down(index), strategy)(current)
 
       case Exclude(index) =>
         balancer(providers.exclude(index), strategy)(current)
