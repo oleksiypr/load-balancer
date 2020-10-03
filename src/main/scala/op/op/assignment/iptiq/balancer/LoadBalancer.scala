@@ -13,6 +13,7 @@ object LoadBalancer {
   final case class ProviderUp(index: Int) extends Message
   final case class ProviderDown(index: Int) extends Message
   final case class Exclude(index: Int) extends Message
+  final case class Include(index: Int) extends Message
 
   type Max    = Int
   type Index  = Int
@@ -70,6 +71,9 @@ object LoadBalancer {
 
       case Exclude(index) =>
         balancer(providers.exclude(index), strategy)(current)
+
+      case Include(index) =>
+        balancer(providers.include(index), strategy)(current)
 
       case Register(_) => Behaviors.same
     }

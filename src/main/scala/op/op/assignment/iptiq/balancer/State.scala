@@ -36,15 +36,16 @@ private[balancer] final case class State(providers: Vector[ProviderState]) {
 
   val size: Int = available.size
 
-  def apply(i: Int): Option[ProviderState] = {
+  def apply(i: Index): Option[ProviderState] = {
     if (i < 0 || i >= size) None
     else Some(available(i))
   }
 
-  def up(i: Int)  : State = updated(i, Status.Up)
-  def down(i: Int): State = updated(i, Status.Down)
+  def up  (i: Index): State = updated(i, Status.Up)
+  def down(i: Index): State = updated(i, Status.Down)
 
   def exclude(i: Index): State = updated(i, Status.Off)
+  def include(i: Index): State = updated(i, Status.On)
 
   private def updated(i: Int, e: Status.Event): State =
     if (i < 0 || i >= providers.size) this
