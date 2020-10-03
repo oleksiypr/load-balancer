@@ -19,8 +19,7 @@ object LoadBalancer {
   type Index  = Int
   type Next   = Int
 
-  type BalanceStrategy = Max => Index => Next
-
+  type BalanceStrategy  = Max => Index => Next
   type HeartBeatFactory = ActorContext[Message] => Behavior[HeartBeat.Message]
 
   val noHeartBeat: HeartBeatFactory = _ => Behaviors.ignore
