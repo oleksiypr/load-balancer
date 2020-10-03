@@ -109,6 +109,10 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(ProviderUp(0))
       testKit.run(Request(requester.ref))
       providerInbox.expectMessage(Provider.Get(requester.ref))
+
+      testKit.run(ProviderDown(0))
+      testKit.run(Request(requester.ref))
+      providerInbox.hasMessages shouldBe false
     }
   }
 }

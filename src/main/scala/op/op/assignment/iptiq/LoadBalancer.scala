@@ -22,11 +22,14 @@ object LoadBalancer {
       else Some(available(i))
     }
 
-    def providerUp(i: Int): Providers =
+    def providerUp(i: Int)  : Providers = statusUpdated(i, Available)
+    def providerDown(i: Int): Providers = statusUpdated(i, Unavailable)
+
+    private def statusUpdated(i: Int, s: ProviderStatus): Providers =
       if (i < 0 || i >= states.size) this
       else {
-        val available = states(i).copy(status = Available)
-        val updated   = states.updated(i, available)
+        val state   = states(i).copy(status = s)
+        val updated = states.updated(i, state)
         copy(updated)
       }
   }
@@ -36,6 +39,7 @@ object LoadBalancer {
   final case class Request(replyTo: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
   final case class ProviderUp(index: Int) extends Message
+  final case class ProviderDown(index: Int) extends Message
 
   type BalanceStrategy = Int => Int
 
@@ -78,6 +82,9 @@ object LoadBalancer {
 
         case ProviderUp(index) =>
           balancer(providers.providerUp(index))(current)
+
+        case ProviderDown(index) =>
+          balancer(providers.providerDown(index))(current)
 
         case Register(_) => Behaviors.same
       }
