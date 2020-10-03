@@ -120,5 +120,28 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       providerInbox.hasMessages shouldBe false
     }
+
+    "include/exclude a specific provider into the balancer" in {
+      val providerInbox = TestInbox[Provider.Get]()
+
+      val providers = Providers(
+        Vector(
+          ProviderState(
+            providerInbox.ref,
+            LoadBalancer.Available
+          )
+        )
+      )
+
+      val requester = TestInbox[String]()
+      val testKit   = BehaviorTestKit(balancer(providers, roundRobin)(current = 0))
+
+      testKit.run(Request(requester.ref))
+      providerInbox.expectMessage(Provider.Get(requester.ref))
+
+      testKit.run(Exclude(0))
+      testKit.run(Request(requester.ref))
+      providerInbox.hasMessages shouldBe false
+    }
   }
 }

@@ -9,10 +9,12 @@ object LoadBalancer {
   sealed trait ProviderStatus
   case object Available extends ProviderStatus
   case object Unavailable extends ProviderStatus
+  case object Excluded extends ProviderStatus
 
   final case class ProviderState(providerRef: ActorRef[Provider.Get], status: ProviderStatus)
 
   final case class Providers(states: Vector[ProviderState]) {
+
     private[this] val available = states.filter(_.status == Available)
 
     val size: Int = available.size
@@ -24,6 +26,8 @@ object LoadBalancer {
 
     def providerUp(i: Int)  : Providers = statusUpdated(i, Available)
     def providerDown(i: Int): Providers = statusUpdated(i, Unavailable)
+
+    def exclude(i: Index): Providers = statusUpdated(i, Excluded)
 
     private def statusUpdated(i: Int, s: ProviderStatus): Providers =
       if (i < 0 || i >= states.size) this
@@ -40,6 +44,7 @@ object LoadBalancer {
   final case class Response(id: String, requester: ActorRef[String]) extends Message
   final case class ProviderUp(index: Int) extends Message
   final case class ProviderDown(index: Int) extends Message
+  final case class Exclude(index: Int) extends Message
 
   type Max    = Int
   type Index  = Int
@@ -94,6 +99,9 @@ object LoadBalancer {
 
       case ProviderDown(index) =>
         balancer(providers.providerDown(index), strategy)(current)
+
+      case Exclude(index) =>
+        balancer(providers.exclude(index), strategy)(current)
 
       case Register(_) => Behaviors.same
     }
