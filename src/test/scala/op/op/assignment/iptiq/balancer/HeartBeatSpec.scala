@@ -12,11 +12,11 @@ class HeartBeatSpec extends WordSpec with Matchers {
   import HeartBeat._
 
   "HeartBeat" must {
-    "send Check message to alive provider" in {
+    "start sending Check message to provider" in {
       val balancerInbox = TestInbox[LoadBalancer.Message]()
       val providerInbox = TestInbox[Provider.Message]()
 
-      val heartBeat = BehaviorTestKit(
+      val testKit = BehaviorTestKit(
         checker(
           index = 0,
           balancerInbox.ref,
@@ -24,13 +24,31 @@ class HeartBeatSpec extends WordSpec with Matchers {
         )
       )
 
-      heartBeat.signal(PreRestart)
-      heartBeat.runOne()
+      testKit.signal(PreRestart)
+      testKit.runOne()
 
-      heartBeat.expectEffect(ReceiveTimeoutSet(1.second, NotAlive))
-      providerInbox.expectMessage(Provider.Check(heartBeat.ref, Alive))
+      testKit.expectEffect(ReceiveTimeoutSet(1.second, NotAlive))
+      providerInbox.receiveMessage()
 
-      heartBeat.run(Alive)
+      testKit.run(Alive)
+      balancerInbox.hasMessages shouldBe false
+    }
+
+    "send Check message to alive provider" in {
+      val balancerInbox = TestInbox[LoadBalancer.Message]()
+      val providerInbox = TestInbox[Provider.Message]()
+
+      val testKit = BehaviorTestKit(
+        heartBeat(
+          index = 0,
+          balancerInbox.ref,
+          providerInbox.ref
+        )
+      )
+
+      testKit.run(Alive)
+      providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
+
       balancerInbox.hasMessages shouldBe false
     }
 
@@ -38,21 +56,21 @@ class HeartBeatSpec extends WordSpec with Matchers {
       val balancerInbox = TestInbox[LoadBalancer.Message]()
       val providerInbox = TestInbox[Provider.Message]()
 
-      val heartBeat = BehaviorTestKit(
-        checker(
+      val testKit = BehaviorTestKit(
+        heartBeat(
           index = 0,
           balancerInbox.ref,
-          providerInbox.ref,
+          providerInbox.ref
         )
       )
 
-      heartBeat.signal(PreRestart)
-      heartBeat.runOne()
-
-      providerInbox.receiveMessage()
-      heartBeat.run(NotAlive)
-
+      testKit.run(NotAlive)
       balancerInbox.expectMessage(LoadBalancer.ProviderDown(0))
+      providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
+
+      testKit.run(NotAlive)
+      providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
+      balancerInbox.hasMessages shouldBe false
     }
   }
 }

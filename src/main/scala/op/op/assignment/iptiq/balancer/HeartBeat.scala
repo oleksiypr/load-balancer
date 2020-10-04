@@ -23,10 +23,10 @@ object HeartBeat {
 
     case (ctx, PreRestart) =>
       ctx.self ! Start
-      heartBeat(index, balancer, provider, timeout)
+      starting(index, balancer, provider, timeout)
   }
 
-  private def heartBeat(
+  private def starting(
     index:  LoadBalancer.Index,
     balancer: LoadBalancer.SelfRef,
     provider: Provider.SelfRef,
@@ -36,15 +36,51 @@ object HeartBeat {
       case Start =>
         provider ! Provider.Check(replyTo = ctx.self, Alive)
         ctx.setReceiveTimeout(timeout, NotAlive)
+        heartBeat(index, balancer, provider)
+
+      case other =>
+        ctx.log.error(s"Start expected in this state, but received: $other")
         Behaviors.same
+    }
+  }
+
+  private[balancer] def heartBeat(
+    index:  LoadBalancer.Index,
+    balancer: LoadBalancer.SelfRef,
+    provider: Provider.SelfRef
+  ): Behavior[Message] = setup { ctx => receiveMessage {
 
       case Alive =>
         ctx.log.info(s"Provider[$index] alive")
+        provider ! Provider.Check(replyTo = ctx.self, Alive)
         Behaviors.same
 
       case NotAlive =>
         ctx.log.info(s"Provider[$index] not alive")
         balancer ! LoadBalancer.ProviderDown(0)
+        provider ! Provider.Check(replyTo = ctx.self, Alive)
+        notAlive(index, balancer, provider)
+
+      case other =>
+        ctx.log.error(s"Alive or NotAlive expected in this state, but received: $other")
+        Behaviors.same
+    }
+  }
+
+  private[balancer] def notAlive(
+    index:  LoadBalancer.Index,
+    balancer: LoadBalancer.SelfRef,
+    provider: Provider.SelfRef
+  ): Behavior[Message] = setup { ctx => receiveMessage {
+
+      case Alive => ???
+
+      case NotAlive =>
+        provider ! Provider.Check(replyTo = ctx.self, Alive)
+        Behaviors.same
+
+      case other =>
+        ctx.log.error(s"Alive or NotAlive expected in this state, but received: $other")
         Behaviors.same
     }
   }
