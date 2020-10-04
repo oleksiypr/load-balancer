@@ -1,30 +1,33 @@
 package op.op.assignment.iptiq.balancer
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import op.op.assignment.iptiq.provider.Provider
 
 object LoadBalancer {
 
+  type SelfRef     = ActorRef[Message]
+  type ProviderRef = ActorRef[Provider.Message]
+
+  type Max    = Int
+  type Index  = Int
+  type Next   = Int
+
+  type HeartBeatFactory = (SelfRef, ProviderRef) => Behavior[HeartBeat.Message]
+  type BalanceStrategy  = Max => Index => Next
+
+  val noHeartBeat: HeartBeatFactory = (_, _) => Behaviors.ignore
+
+  def roundRobin(n: Int)(i: Int): Int = (i + 1) % n
+
   sealed trait Message
-  final case class Register(providerRefs: Vector[ActorRef[Provider.Get]]) extends Message
+  final case class Register(providerRefs: Vector[ProviderRef]) extends Message
   final case class Request(replyTo: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
   final case class ProviderUp(index: Int) extends Message
   final case class ProviderDown(index: Int) extends Message
   final case class Exclude(index: Int) extends Message
   final case class Include(index: Int) extends Message
-
-  type Max    = Int
-  type Index  = Int
-  type Next   = Int
-
-  type BalanceStrategy  = Max => Index => Next
-  type HeartBeatFactory = ActorContext[Message] => Behavior[HeartBeat.Message]
-
-  val noHeartBeat: HeartBeatFactory = _ => Behaviors.ignore
-
-  def roundRobin(n: Int)(i: Int): Int =  (i + 1) % n
 
   def idle(
     max: Int,
@@ -36,7 +39,7 @@ object LoadBalancer {
       case Register(providerRefs) =>
         val refs = providerRefs.take(max)
         val providers = State(refs.map(ProviderState(_, Unavailable)))
-        refs.foreach(_ => ctx.spawnAnonymous(heartBeatFactory(ctx)))
+        refs.foreach(r => ctx.spawnAnonymous(heartBeatFactory(ctx.self, r)))
         balancer(providers, strategy)(current = 0)
 
       case _ =>
