@@ -16,15 +16,19 @@ class HeartBeatSpec extends WordSpec with Matchers {
 
       val heartBeat = BehaviorTestKit(
         checker(
+          index = 0,
           balancerInbox.ref,
-          providerInbox.ref
+          providerInbox.ref,
         )
       )
 
       heartBeat.signal(PreRestart)
       heartBeat.runOne()
 
-      providerInbox.expectMessage(Provider.Check(heartBeat.ref))
+      providerInbox.expectMessage(Provider.Check(heartBeat.ref, Alive))
+
+      heartBeat.run(Alive)
+      balancerInbox.hasMessages shouldBe false
     }
   }
 }

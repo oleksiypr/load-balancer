@@ -9,6 +9,6 @@ object Provider {
 
   sealed trait Message
   final case class Get(replyTo: ActorRef[String]) extends Message
-  final case class Check(replyTo: ActorRef[_]) extends Message
+  final case class Check(replyTo: ActorRef[_], acknowledge: Any) extends Message
 }
 

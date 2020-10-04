@@ -15,10 +15,10 @@ object LoadBalancer {
   type Index  = Int
   type Next   = Int
 
-  type HeartBeatFactory = (SelfRef, ProviderRef) => Behavior[HeartBeat.Message]
+  type HeartBeatFactory = (Index, SelfRef, ProviderRef) => Behavior[HeartBeat.Message]
   type BalanceStrategy  = Max => Index => Next
 
-  val noHeartBeat: HeartBeatFactory = (_, _) => Behaviors.ignore
+  val noHeartBeat: HeartBeatFactory = (_, _, _) => Behaviors.ignore
 
   def roundRobin(n: Int)(i: Int): Int = (i + 1) % n
 
@@ -40,7 +40,10 @@ object LoadBalancer {
       case Register(providerRefs) =>
         val refs = providerRefs.take(max)
         val providers = State(refs.map(ProviderState(_, Unavailable)))
-        refs.foreach(r => ctx.spawnAnonymous(heartBeatFactory(ctx.self, r)))
+        refs.zipWithIndex.foreach {
+          case (ref, index) =>
+            ctx.spawnAnonymous(heartBeatFactory(index, ctx.self, ref))
+        }
         balancer(providers, strategy)(current = 0)
 
       case _ =>
