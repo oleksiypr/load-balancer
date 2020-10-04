@@ -2,7 +2,7 @@ package op.op.assignment.iptiq.provider
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import op.op.assignment.iptiq.balancer.LoadBalancer
+import op.op.assignment.iptiq.balancer.{HeartBeat, LoadBalancer}
 
 
 object Provider {
@@ -11,14 +11,22 @@ object Provider {
 
   sealed trait Message
   final case class Get(requester: ActorRef[String], balancer: LoadBalancer.SelfRef) extends Message
-  final case class Check(replyTo: ActorRef[_], acknowledge: Any) extends Message
+  final case class Check(replyTo: HeartBeat.SelfRef, acknowledge: HeartBeat.Message) extends Message
 
-  def available(): Boolean = ???
+  private[this] val rnd       = scala.util.Random
+  private[this] val threshold = 0.5
+
+  def available(): Boolean = rnd.nextDouble() >= threshold
 
   def provider(id: String): Behavior[Message] = Behaviors.receiveMessage {
-    case Get(replyTo, _) =>
-      ???
-    case Check(replyTo, ack) if available() => ???
+    case Get(requester, balancer) =>
+      balancer ! LoadBalancer.Response(id, requester)
+      Behaviors.same
+
+    case Check(replyTo, ack) if available() =>
+      replyTo ! ack
+      Behaviors.same
+
     case Check(_, _) => Behaviors.same
   }
 }

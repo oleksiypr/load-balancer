@@ -20,7 +20,10 @@ object LoadBalancer {
 
   val noHeartBeat: HeartBeatFactory = (_, _, _) => Behaviors.ignore
 
-  def roundRobin(n: Int)(i: Int): Int = (i + 1) % n
+  private[this] val rnd = scala.util.Random
+
+  val roundRobin: BalanceStrategy = n => i => (i + 1) % n
+  val random    : BalanceStrategy = n => _ => rnd.nextInt(n) % n
 
   sealed trait Message
   final case class Register(providerRefs: Vector[ProviderRef]) extends Message

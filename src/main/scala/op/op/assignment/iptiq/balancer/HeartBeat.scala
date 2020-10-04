@@ -1,11 +1,13 @@
 package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{Behavior, PreRestart}
+import akka.actor.typed.{ActorRef, Behavior, PreRestart}
 import op.op.assignment.iptiq.provider.Provider
 import scala.concurrent.duration._
 
 object HeartBeat {
+
+  type SelfRef = ActorRef[Message]
 
   import Behaviors.{receiveMessage, receiveSignal, setup}
 
