@@ -6,8 +6,10 @@ import op.op.assignment.iptiq.provider.Provider
 
 object LoadBalancer {
 
+  import Behaviors.{setup, receiveMessage}
+
   type SelfRef     = ActorRef[Message]
-  type ProviderRef = ActorRef[Provider.Message]
+  type ProviderRef = Provider.SelfRef
 
   type Max    = Int
   type Index  = Int
@@ -33,8 +35,7 @@ object LoadBalancer {
     max: Int,
     strategy: BalanceStrategy = roundRobin,
     heartBeatFactory: HeartBeatFactory = noHeartBeat
-  ): Behavior[Message] = Behaviors.setup[Message] { ctx =>
-    Behaviors.receiveMessage[Message] {
+  ): Behavior[Message] = setup { ctx => receiveMessage {
 
       case Register(providerRefs) =>
         val refs = providerRefs.take(max)
@@ -53,8 +54,7 @@ object LoadBalancer {
   )(
     current: Int,
     next: Index => Next = strategy(providers.size)
-  ): Behavior[Message] = Behaviors.setup[Message] { _ =>
-    Behaviors.receiveMessage[Message] {
+  ): Behavior[Message] = setup { _ => receiveMessage {
 
       case Request(replyTo) =>
         providers(current) match {

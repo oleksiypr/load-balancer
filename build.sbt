@@ -7,9 +7,9 @@ scalaVersion := "2.12.8"
 organization := "op.assignment"
 
 libraryDependencies ++= Seq(
-	"com.typesafe.akka" %% "akka-actor-typed" 			% "2.5.31",
- 	"com.typesafe.akka" %% "akka-actor-testkit-typed"	% "2.5.31"	% Test,
-    "org.scalatest" 	%% "scalatest" 		  			% "3.0.5"	% Test
+	"com.typesafe.akka" %% "akka-actor-typed" 			    % "2.6.9",
+ 	"com.typesafe.akka" %% "akka-actor-testkit-typed"   % "2.6.9"	% Test,
+  "org.scalatest" 	%% "scalatest"                    % "3.0.5"	% Test
 )
 
 // see https://tpolecat.github.io/2017/04/25/scalac-flags.html for scalacOptions descriptions
