@@ -17,7 +17,7 @@ object Main extends App {
 
   val main: Behavior[Message] =  setup { ctx =>
     val replyTo = ctx.spawnAnonymous(requester)
-    val max = 1
+    val max = 10
     val providers = (0 until max)
       .map(i => ctx
         .spawn(
@@ -51,7 +51,10 @@ object Main extends App {
   val system: ActorSystem[Message] = ActorSystem(main, "load-balancer")
   Thread.sleep(2000)
 
-  system ! Request
+  val n = 100
+  for (_ <- 0 to 100) {
+    system ! Request
+  }
 
   Thread.sleep(2000)
   system ! Stop

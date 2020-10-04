@@ -14,7 +14,7 @@ object Provider {
   final case class Check(replyTo: HeartBeat.SelfRef, acknowledge: HeartBeat.Message) extends Message
 
   private[this] val rnd       = scala.util.Random
-  private[this] val threshold = 0.0
+  private[this] val threshold = 0.5
 
   def available(): Boolean = rnd.nextDouble() >= threshold
 
@@ -23,11 +23,11 @@ object Provider {
       balancer ! LoadBalancer.Response(id, requester)
       Behaviors.same
 
-    case Check(replyTo, ack) /*if available()*/ =>
+    case Check(replyTo, ack) if available() =>
       replyTo ! ack
       Behaviors.same
 
-    //case Check(_, _) => Behaviors.same
+    case Check(_, _) => Behaviors.same
   }
 }
 
