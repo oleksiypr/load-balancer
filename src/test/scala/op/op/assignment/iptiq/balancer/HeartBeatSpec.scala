@@ -2,7 +2,6 @@ package op.op.assignment.iptiq.balancer
 
 import akka.actor.testkit.typed.Effect.{NoEffects, ReceiveTimeoutSet, Scheduled}
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
-import op.op.assignment.iptiq.provider.Provider
 import org.scalatest.{Matchers, WordSpec}
 import scala.concurrent.duration._
 
@@ -13,7 +12,7 @@ class HeartBeatSpec extends WordSpec with Matchers {
   "HeartBeat" must {
     "start sending Check message to provider" in {
       val balancerInbox = TestInbox[LoadBalancer.Message]()
-      val providerInbox = TestInbox[Provider.Message]()
+      val providerInbox = TestInbox[ProviderProxy.Message]()
 
       val testKit = BehaviorTestKit(
         checker(
@@ -35,7 +34,7 @@ class HeartBeatSpec extends WordSpec with Matchers {
 
     "send Check message to alive provider" in {
       val balancerInbox = TestInbox[LoadBalancer.Message]()
-      val providerInbox = TestInbox[Provider.Message]()
+      val providerInbox = TestInbox[ProviderProxy.Message]()
 
       val testKit = BehaviorTestKit(
         heartBeat(
@@ -52,7 +51,7 @@ class HeartBeatSpec extends WordSpec with Matchers {
         Scheduled(
           delay = 1.second,
           target = providerInbox.ref,
-          message = Provider.Check(testKit.ref, Alive)
+          message = ProviderProxy.Check(testKit.ref, Alive)
         )
       )
       balancerInbox.hasMessages shouldBe true
@@ -60,7 +59,7 @@ class HeartBeatSpec extends WordSpec with Matchers {
 
     "send Check message to not alive provider" in {
       val balancerInbox = TestInbox[LoadBalancer.Message]()
-      val providerInbox = TestInbox[Provider.Message]()
+      val providerInbox = TestInbox[ProviderProxy.Message]()
 
       val testKit = BehaviorTestKit(
         heartBeat(
@@ -73,17 +72,17 @@ class HeartBeatSpec extends WordSpec with Matchers {
 
       testKit.run(NotAlive)
       balancerInbox.expectMessage(LoadBalancer.ProviderDown(0))
-      providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
+      providerInbox.expectMessage(ProviderProxy.Check(testKit.ref, Alive))
 
       testKit.run(NotAlive)
-      providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
+      providerInbox.expectMessage(ProviderProxy.Check(testKit.ref, Alive))
       balancerInbox.hasMessages shouldBe false
     }
 
     "become alive again" when {
       "it has successfully been `heartbeat checked` for 2 consecutive times" in {
         val balancerInbox = TestInbox[LoadBalancer.Message]()
-        val providerInbox = TestInbox[Provider.Message]()
+        val providerInbox = TestInbox[ProviderProxy.Message]()
 
         val testKit = BehaviorTestKit(
           notAlive(
@@ -100,12 +99,12 @@ class HeartBeatSpec extends WordSpec with Matchers {
           Scheduled(
             delay = 1.second,
             target = providerInbox.ref,
-            message = Provider.Check(testKit.ref, Alive)
+            message = ProviderProxy.Check(testKit.ref, Alive)
           )
         )
 
         testKit.run(NotAlive)
-        providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
+        providerInbox.expectMessage(ProviderProxy.Check(testKit.ref, Alive))
         testKit.expectEffect(NoEffects)
 
         testKit.run(Alive)
@@ -114,17 +113,17 @@ class HeartBeatSpec extends WordSpec with Matchers {
           Scheduled(
             delay = 1.second,
             target = providerInbox.ref,
-            message = Provider.Check(testKit.ref, Alive)
+            message = ProviderProxy.Check(testKit.ref, Alive)
           )
         )
 
         balancerInbox.hasMessages shouldBe false
 
         testKit.run(Alive)
-        testKit.expectEffectType[Scheduled[Provider.Check]]
+        testKit.expectEffectType[Scheduled[ProviderProxy.Check]]
 
         testKit.run(Alive)
-        testKit.expectEffectType[Scheduled[Provider.Check]]
+        testKit.expectEffectType[Scheduled[ProviderProxy.Check]]
 
         balancerInbox.expectMessage(LoadBalancer.ProviderUp(0))
       }

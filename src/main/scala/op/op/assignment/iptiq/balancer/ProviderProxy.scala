@@ -1,11 +1,12 @@
-package op.op.assignment.iptiq.provider
+package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import op.op.assignment.iptiq.balancer.{HeartBeat, LoadBalancer}
 
-
-object Provider {
+/**
+ * Here we emulate request to real provider.
+ */
+object ProviderProxy {
 
   type SelfRef = ActorRef[Message]
 
@@ -18,12 +19,18 @@ object Provider {
 
   def available(): Boolean = rnd.nextDouble() >= threshold
 
+  def doRequest(): Unit = ()
+
+  def doCheck(): Unit = ()
+
   def provider(id: String): Behavior[Message] = Behaviors.receiveMessage {
     case Get(requester, balancer) =>
+      doRequest()
       balancer ! LoadBalancer.Response(id, requester)
       Behaviors.same
 
     case Check(replyTo, ack) if available() =>
+      doCheck()
       replyTo ! ack
       Behaviors.same
 

@@ -2,14 +2,13 @@ package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import op.op.assignment.iptiq.provider.Provider
 
 object LoadBalancer {
 
   import Behaviors.{receiveMessage, setup}
 
   type SelfRef     = ActorRef[Message]
-  type ProviderRef = Provider.SelfRef
+  type ProviderRef = ProviderProxy.SelfRef
 
   type Max    = Int
   type Index  = Int
@@ -70,7 +69,7 @@ object LoadBalancer {
         providers(current) match {
           case Some(p) =>
             ctx.log.info(s"Request will be dispatched to ${p.providerRef}")
-            p.providerRef ! Provider.Get(requester, ctx.self)
+            p.providerRef ! ProviderProxy.Get(requester, ctx.self)
             balancer(providers, strategy)(next(current))
           case None    =>
             requester ! "No providers available"

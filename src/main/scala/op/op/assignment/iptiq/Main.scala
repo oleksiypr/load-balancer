@@ -3,9 +3,8 @@ package op.op.assignment.iptiq
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.Behaviors.{receiveMessage, setup}
 import akka.actor.typed.{ActorSystem, Behavior, Terminated}
-import op.op.assignment.iptiq.balancer.{HeartBeat, LoadBalancer}
+import op.op.assignment.iptiq.balancer.{HeartBeat, LoadBalancer, ProviderProxy}
 import op.op.assignment.iptiq.balancer.LoadBalancer.Register
-import op.op.assignment.iptiq.provider.Provider
 
 object Main extends App {
 
@@ -21,7 +20,7 @@ object Main extends App {
     val providers = (0 until max)
       .map(i => ctx
         .spawn(
-          Provider.provider(s"#$i"),
+          ProviderProxy.provider(s"#$i"),
           name = s"provider-$i"
         )
       ).toVector

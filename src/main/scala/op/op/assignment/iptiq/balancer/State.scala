@@ -2,7 +2,6 @@ package op.op.assignment.iptiq.balancer
 
 import akka.actor.typed.ActorRef
 import LoadBalancer._
-import op.op.assignment.iptiq.provider.Provider
 
 private[balancer] sealed trait Status
 private[balancer] case object Available extends Status
@@ -28,7 +27,10 @@ private[balancer] object Status {
     }
 }
 
-private[balancer] final case class ProviderState(providerRef: ActorRef[Provider.Get], status: Status)
+private[balancer] final case class ProviderState(
+  providerRef: ActorRef[ProviderProxy.Get],
+  status: Status
+)
 
 private[balancer] final case class State(providers: Vector[ProviderState]) {
 

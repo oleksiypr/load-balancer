@@ -3,7 +3,6 @@ package op.op.assignment.iptiq.balancer
 import java.util.UUID
 import akka.actor.testkit.typed.Effect._
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
-import op.op.assignment.iptiq.provider.Provider
 import org.scalatest.{Matchers, WordSpec}
 
 class LoadBalancerSpec extends WordSpec with Matchers {
@@ -15,8 +14,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val testKit   = BehaviorTestKit(idle(max = 2))
       val requester = TestInbox[String]()
 
-      val providerInbox1 = TestInbox[Provider.Message]()
-      val providerInbox2 = TestInbox[Provider.Message]()
+      val providerInbox1 = TestInbox[ProviderProxy.Message]()
+      val providerInbox2 = TestInbox[ProviderProxy.Message]()
 
       testKit.run(Register(Vector(providerInbox1.ref, providerInbox2.ref)))
 
@@ -31,17 +30,17 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
-      providerInbox2.expectMessage(Provider.Get(requester.ref, testKit.ref))
-      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox1.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
+      providerInbox2.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
+      providerInbox1.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
     }
 
     "register not more than max providers" in {
       val testKit   = BehaviorTestKit(idle(max = 1))
       val requester = TestInbox[String]()
 
-      val provider1 = TestInbox[Provider.Message]()
-      val provider2 = TestInbox[Provider.Message]()
+      val provider1 = TestInbox[ProviderProxy.Message]()
+      val provider2 = TestInbox[ProviderProxy.Message]()
 
       testKit.run(Register(Vector(provider1.ref, provider2.ref)))
       testKit.run(ProviderUp(0))
@@ -49,8 +48,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      provider1.expectMessage(Provider.Get(requester.ref, testKit.ref))
-      provider1.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      provider1.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
+      provider1.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
       provider2.hasMessages shouldBe false
     }
 
@@ -66,8 +65,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     }
 
     "invoke available providers only" in {
-      val providerInbox1 = TestInbox[Provider.Get]()
-      val providerInbox2 = TestInbox[Provider.Get]()
+      val providerInbox1 = TestInbox[ProviderProxy.Get]()
+      val providerInbox2 = TestInbox[ProviderProxy.Get]()
 
       val available   = ProviderState(providerInbox1.ref, Available)
       val unavailable = ProviderState(providerInbox2.ref, Unavailable)
@@ -80,23 +79,23 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox1.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
       providerInbox2.hasMessages shouldBe false
-      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox1.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
     }
 
     "create heart beat checkers" in {
       val testKit = BehaviorTestKit(idle(max = 2))
 
-      val provider1 = TestInbox[Provider.Message]()
-      val provider2 = TestInbox[Provider.Message]()
+      val provider1 = TestInbox[ProviderProxy.Message]()
+      val provider2 = TestInbox[ProviderProxy.Message]()
 
       testKit.run(Register(Vector(provider1.ref, provider2.ref)))
       testKit.expectEffectType[Spawned[HeartBeat.Message]]
     }
 
     "handle ProviderStatus messages" in {
-      val providerInbox = TestInbox[Provider.Get]()
+      val providerInbox = TestInbox[ProviderProxy.Get]()
 
       val providers = State(
         Vector(
@@ -115,7 +114,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
 
       testKit.run(ProviderUp(0))
       testKit.run(Request(requester.ref))
-      providerInbox.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
 
       testKit.run(ProviderDown(0))
       testKit.run(Request(requester.ref))
@@ -123,7 +122,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
     }
 
     "include/exclude a specific provider into the balancer" in {
-      val providerInbox = TestInbox[Provider.Get]()
+      val providerInbox = TestInbox[ProviderProxy.Get]()
 
       val providers = State(
         Vector(
@@ -138,7 +137,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val testKit   = BehaviorTestKit(balancer(providers, roundRobin)(current = 0))
 
       testKit.run(Request(requester.ref))
-      providerInbox.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
 
       testKit.run(Exclude(0))
       testKit.run(Request(requester.ref))
@@ -151,7 +150,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Include(0))
       testKit.run(ProviderUp(0))
       testKit.run(Request(requester.ref))
-      providerInbox.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox.expectMessage(ProviderProxy.Get(requester.ref, testKit.ref))
     }
   }
 }
