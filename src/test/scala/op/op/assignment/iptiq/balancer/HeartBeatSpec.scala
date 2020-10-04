@@ -1,9 +1,11 @@
 package op.op.assignment.iptiq.balancer
 
+import akka.actor.testkit.typed.Effect.ReceiveTimeoutSet
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
 import akka.actor.typed.PreRestart
 import op.op.assignment.iptiq.provider.Provider
 import org.scalatest.{Matchers, WordSpec}
+import scala.concurrent.duration._
 
 class HeartBeatSpec extends WordSpec with Matchers {
 
@@ -25,6 +27,7 @@ class HeartBeatSpec extends WordSpec with Matchers {
       heartBeat.signal(PreRestart)
       heartBeat.runOne()
 
+      heartBeat.expectEffect(ReceiveTimeoutSet(1.second, NotAlive))
       providerInbox.expectMessage(Provider.Check(heartBeat.ref, Alive))
 
       heartBeat.run(Alive)
