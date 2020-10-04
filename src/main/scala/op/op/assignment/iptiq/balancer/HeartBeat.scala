@@ -7,7 +7,7 @@ import scala.concurrent.duration._
 
 object HeartBeat {
 
-  import Behaviors.{receiveMessage, setup, receiveSignal}
+  import Behaviors.{receiveMessage, receiveSignal, setup}
 
   sealed trait Message
   private case object Start extends Message
@@ -73,11 +73,34 @@ object HeartBeat {
     provider: Provider.SelfRef
   ): Behavior[Message] = setup { ctx => receiveMessage {
 
-      case Alive => ???
+      case Alive =>
+        provider ! Provider.Check(replyTo = ctx.self, Alive)
+        semiAlive(index, balancer, provider)
 
       case NotAlive =>
         provider ! Provider.Check(replyTo = ctx.self, Alive)
         Behaviors.same
+
+      case other =>
+        ctx.log.error(s"Alive or NotAlive expected in this state, but received: $other")
+        Behaviors.same
+    }
+  }
+
+  private def semiAlive(
+    index:  LoadBalancer.Index,
+    balancer: LoadBalancer.SelfRef,
+    provider: Provider.SelfRef
+  ): Behavior[Message] = setup { ctx => receiveMessage {
+
+      case Alive =>
+        provider ! Provider.Check(replyTo = ctx.self, Alive)
+        balancer ! LoadBalancer.ProviderUp(0)
+        heartBeat(index, balancer, provider)
+
+      case NotAlive =>
+        provider ! Provider.Check(replyTo = ctx.self, Alive)
+        notAlive(index, balancer, provider)
 
       case other =>
         ctx.log.error(s"Alive or NotAlive expected in this state, but received: $other")
