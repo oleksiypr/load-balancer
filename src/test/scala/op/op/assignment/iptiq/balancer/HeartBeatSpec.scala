@@ -30,5 +30,26 @@ class HeartBeatSpec extends WordSpec with Matchers {
       heartBeat.run(Alive)
       balancerInbox.hasMessages shouldBe false
     }
+
+    "send Check message to not alive provider" in {
+      val balancerInbox = TestInbox[LoadBalancer.Message]()
+      val providerInbox = TestInbox[Provider.Message]()
+
+      val heartBeat = BehaviorTestKit(
+        checker(
+          index = 0,
+          balancerInbox.ref,
+          providerInbox.ref,
+        )
+      )
+
+      heartBeat.signal(PreRestart)
+      heartBeat.runOne()
+
+      providerInbox.receiveMessage()
+      heartBeat.run(NotAlive)
+
+      balancerInbox.expectMessage(LoadBalancer.ProviderDown(0))
+    }
   }
 }

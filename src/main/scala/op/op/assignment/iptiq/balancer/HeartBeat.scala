@@ -11,6 +11,7 @@ object HeartBeat {
   sealed trait Message
   case object Beat extends Message
   case object Alive extends Message
+  case object NotAlive extends Message
 
   def checker(
     index:  LoadBalancer.Index,
@@ -32,8 +33,14 @@ object HeartBeat {
       case Beat =>
         provider ! Provider.Check(replyTo = ctx.self, Alive)
         Behaviors.same
+
       case Alive =>
         ctx.log.info(s"Provider[$index] alive")
+        Behaviors.same
+
+      case NotAlive =>
+        ctx.log.info(s"Provider[$index] not alive")
+        balancer ! LoadBalancer.ProviderDown(0)
         Behaviors.same
     }
   }
