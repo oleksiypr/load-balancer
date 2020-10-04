@@ -6,7 +6,7 @@ import op.op.assignment.iptiq.provider.Provider
 
 object LoadBalancer {
 
-  import Behaviors.{setup, receiveMessage}
+  import Behaviors.{receiveMessage, setup}
 
   type SelfRef     = ActorRef[Message]
   type ProviderRef = Provider.SelfRef
@@ -45,10 +45,11 @@ object LoadBalancer {
         val providers = State(refs.map(ProviderState(_, Unavailable)))
         refs.zipWithIndex.foreach {
           case (ref, index) =>
-            ctx.spawn(
+            val checker = ctx.spawn(
               heartBeatFactory(index, ctx.self, ref),
               name = s"provider-$index"
             )
+            checker ! HeartBeat.Start
         }
         balancer(providers, strategy)(current = 0)
 
@@ -73,6 +74,7 @@ object LoadBalancer {
             balancer(providers, strategy)(next(current))
           case None    =>
             requester ! "No providers available"
+            ctx.log.warn("No providers available")
             Behaviors.same
         }
 
@@ -82,11 +84,10 @@ object LoadBalancer {
         Behaviors.same
 
       case ProviderUp(index) =>
-        ctx.log.warn(s"Provider[$index] down")
         balancer(providers.up(index), strategy)(current)
 
       case ProviderDown(index) =>
-        ctx.log.debug(s"Provider[$index] up")
+        ctx.log.debug(s"Provider[$index] down")
         balancer(providers.down(index), strategy)(current)
 
       case Exclude(index) =>

@@ -1,8 +1,7 @@
 package op.op.assignment.iptiq.balancer
 
-import akka.actor.testkit.typed.Effect.{NoEffects, ReceiveTimeoutSet}
+import akka.actor.testkit.typed.Effect.{NoEffects, ReceiveTimeoutSet, Scheduled}
 import akka.actor.testkit.typed.scaladsl.{BehaviorTestKit, TestInbox}
-import akka.actor.typed.PreRestart
 import op.op.assignment.iptiq.provider.Provider
 import org.scalatest.{Matchers, WordSpec}
 import scala.concurrent.duration._
@@ -21,17 +20,17 @@ class HeartBeatSpec extends WordSpec with Matchers {
           index = 0,
           balancerInbox.ref,
           providerInbox.ref,
+          repeat = 1.second
         )
       )
 
-      testKit.signal(PreRestart)
-      testKit.runOne()
+      testKit.run(Start)
 
-      testKit.expectEffect(ReceiveTimeoutSet(1.second, NotAlive))
+      testKit.expectEffect(ReceiveTimeoutSet(1.1.second, NotAlive))
       providerInbox.receiveMessage()
 
       testKit.run(Alive)
-      balancerInbox.hasMessages shouldBe false
+      balancerInbox.hasMessages shouldBe true
     }
 
     "send Check message to alive provider" in {
@@ -42,14 +41,21 @@ class HeartBeatSpec extends WordSpec with Matchers {
         heartBeat(
           index = 0,
           balancerInbox.ref,
-          providerInbox.ref
+          providerInbox.ref,
+          repeat = 1.second
         )
       )
 
       testKit.run(Alive)
-      providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
 
-      balancerInbox.hasMessages shouldBe false
+      testKit.expectEffect(
+        Scheduled(
+          delay = 1.second,
+          target = providerInbox.ref,
+          message = Provider.Check(testKit.ref, Alive)
+        )
+      )
+      balancerInbox.hasMessages shouldBe true
     }
 
     "send Check message to not alive provider" in {
@@ -60,7 +66,8 @@ class HeartBeatSpec extends WordSpec with Matchers {
         heartBeat(
           index = 0,
           balancerInbox.ref,
-          providerInbox.ref
+          providerInbox.ref,
+          repeat = 1.second
         )
       )
 
@@ -82,30 +89,42 @@ class HeartBeatSpec extends WordSpec with Matchers {
           notAlive(
             index = 0,
             balancerInbox.ref,
-            providerInbox.ref
+            providerInbox.ref,
+            repeat = 1.second
           )
         )
 
         testKit.run(Alive)
-        providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
-        testKit.expectEffect(NoEffects)
+
+        testKit.expectEffect(
+          Scheduled(
+            delay = 1.second,
+            target = providerInbox.ref,
+            message = Provider.Check(testKit.ref, Alive)
+          )
+        )
 
         testKit.run(NotAlive)
         providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
         testKit.expectEffect(NoEffects)
 
         testKit.run(Alive)
-        providerInbox.expectMessage(Provider.Check(testKit.ref, Alive))
-        testKit.expectEffect(NoEffects)
+
+        testKit.expectEffect(
+          Scheduled(
+            delay = 1.second,
+            target = providerInbox.ref,
+            message = Provider.Check(testKit.ref, Alive)
+          )
+        )
+
         balancerInbox.hasMessages shouldBe false
 
         testKit.run(Alive)
-        providerInbox.receiveMessage()
-        testKit.expectEffect(NoEffects)
+        testKit.expectEffectType[Scheduled[Provider.Check]]
 
         testKit.run(Alive)
-        providerInbox.receiveMessage()
-        testKit.expectEffect(NoEffects)
+        testKit.expectEffectType[Scheduled[Provider.Check]]
 
         balancerInbox.expectMessage(LoadBalancer.ProviderUp(0))
       }
