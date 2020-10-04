@@ -31,9 +31,9 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      providerInbox1.expectMessage(Provider.Get(requester.ref))
-      providerInbox2.expectMessage(Provider.Get(requester.ref))
-      providerInbox1.expectMessage(Provider.Get(requester.ref))
+      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox2.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
     }
 
     "register not more than max providers" in {
@@ -49,8 +49,8 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      provider1.expectMessage(Provider.Get(requester.ref))
-      provider1.expectMessage(Provider.Get(requester.ref))
+      provider1.expectMessage(Provider.Get(requester.ref, testKit.ref))
+      provider1.expectMessage(Provider.Get(requester.ref, testKit.ref))
       provider2.hasMessages shouldBe false
     }
 
@@ -80,9 +80,9 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Request(requester.ref))
       testKit.run(Request(requester.ref))
 
-      providerInbox1.expectMessage(Provider.Get(requester.ref))
+      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
       providerInbox2.hasMessages shouldBe false
-      providerInbox1.expectMessage(Provider.Get(requester.ref))
+      providerInbox1.expectMessage(Provider.Get(requester.ref, testKit.ref))
     }
 
     "create heart beat checkers" in {
@@ -115,7 +115,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
 
       testKit.run(ProviderUp(0))
       testKit.run(Request(requester.ref))
-      providerInbox.expectMessage(Provider.Get(requester.ref))
+      providerInbox.expectMessage(Provider.Get(requester.ref, testKit.ref))
 
       testKit.run(ProviderDown(0))
       testKit.run(Request(requester.ref))
@@ -138,7 +138,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val testKit   = BehaviorTestKit(balancer(providers, roundRobin)(current = 0))
 
       testKit.run(Request(requester.ref))
-      providerInbox.expectMessage(Provider.Get(requester.ref))
+      providerInbox.expectMessage(Provider.Get(requester.ref, testKit.ref))
 
       testKit.run(Exclude(0))
       testKit.run(Request(requester.ref))
@@ -151,7 +151,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       testKit.run(Include(0))
       testKit.run(ProviderUp(0))
       testKit.run(Request(requester.ref))
-      providerInbox.expectMessage(Provider.Get(requester.ref))
+      providerInbox.expectMessage(Provider.Get(requester.ref, testKit.ref))
     }
   }
 }

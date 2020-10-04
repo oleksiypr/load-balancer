@@ -88,7 +88,7 @@ object HeartBeat {
   }
 
   private def semiAlive(
-    index:  LoadBalancer.Index,
+    index: LoadBalancer.Index,
     balancer: LoadBalancer.SelfRef,
     provider: Provider.SelfRef
   ): Behavior[Message] = setup { ctx => receiveMessage {

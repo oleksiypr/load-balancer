@@ -24,7 +24,7 @@ object LoadBalancer {
 
   sealed trait Message
   final case class Register(providerRefs: Vector[ProviderRef]) extends Message
-  final case class Request(replyTo: ActorRef[String]) extends Message
+  final case class Request(requester: ActorRef[String]) extends Message
   final case class Response(id: String, requester: ActorRef[String]) extends Message
   final case class ProviderUp(index: Int) extends Message
   final case class ProviderDown(index: Int) extends Message
@@ -62,14 +62,14 @@ object LoadBalancer {
     next: Index => Next = strategy(providers.size)
   ): Behavior[Message] = setup { ctx => receiveMessage {
 
-      case Request(replyTo) =>
+      case Request(requester) =>
         providers(current) match {
           case Some(p) =>
             ctx.log.info(s"Request will be dispatched to ${p.providerRef}")
-            p.providerRef ! Provider.Get(replyTo)
+            p.providerRef ! Provider.Get(requester, ctx.self)
             balancer(providers, strategy)(next(current))
           case None    =>
-            replyTo ! "No providers available"
+            requester ! "No providers available"
             Behaviors.same
         }
 
