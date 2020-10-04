@@ -42,7 +42,10 @@ object LoadBalancer {
         val providers = State(refs.map(ProviderState(_, Unavailable)))
         refs.zipWithIndex.foreach {
           case (ref, index) =>
-            ctx.spawnAnonymous(heartBeatFactory(index, ctx.self, ref))
+            ctx.spawn(
+              heartBeatFactory(index, ctx.self, ref),
+              name = s"provider-$index"
+            )
         }
         balancer(providers, strategy)(current = 0)
 
@@ -57,11 +60,12 @@ object LoadBalancer {
   )(
     current: Int,
     next: Index => Next = strategy(providers.size)
-  ): Behavior[Message] = setup { _ => receiveMessage {
+  ): Behavior[Message] = setup { ctx => receiveMessage {
 
       case Request(replyTo) =>
         providers(current) match {
           case Some(p) =>
+            ctx.log.info(s"Request will be dispatched to ${p.providerRef}")
             p.providerRef ! Provider.Get(replyTo)
             balancer(providers, strategy)(next(current))
           case None    =>
@@ -70,19 +74,24 @@ object LoadBalancer {
         }
 
       case Response(id, requester) =>
+        ctx.log.info(s"Response: {$id} received")
         requester ! id
         Behaviors.same
 
       case ProviderUp(index) =>
+        ctx.log.warn(s"Provider[$index] down")
         balancer(providers.up(index), strategy)(current)
 
       case ProviderDown(index) =>
+        ctx.log.debug(s"Provider[$index] up")
         balancer(providers.down(index), strategy)(current)
 
       case Exclude(index) =>
+        ctx.log.debug(s"Provider[$index] excluded")
         balancer(providers.exclude(index), strategy)(current)
 
       case Include(index) =>
+        ctx.log.debug(s"Provider[$index] included")
         balancer(providers.include(index), strategy)(current)
 
       case Register(_) => Behaviors.same

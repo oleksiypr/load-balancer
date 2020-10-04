@@ -92,7 +92,7 @@ class LoadBalancerSpec extends WordSpec with Matchers {
       val provider2 = TestInbox[Provider.Message]()
 
       testKit.run(Register(Vector(provider1.ref, provider2.ref)))
-      testKit.expectEffectType[SpawnedAnonymous[HeartBeat.Message]]
+      testKit.expectEffectType[Spawned[HeartBeat.Message]]
     }
 
     "handle ProviderStatus messages" in {
